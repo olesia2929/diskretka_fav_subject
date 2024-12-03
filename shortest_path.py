@@ -1,7 +1,4 @@
-"""
-discrete computer project
-"""
-
+"""Implementation of A Star algorithm"""
 import argparse
 import random
 from datetime import datetime
@@ -11,7 +8,7 @@ from numba import jit
 
 start_time = datetime.now()
 
-def create_node(position: tuple[int, int], g: float = float('inf'),
+def create_node(position: tuple, g: float = float('inf'),
                 h: float = 0.0, parent: dict = None) -> dict:
     """
     Create a node for the A* algorithm.
@@ -23,6 +20,18 @@ def create_node(position: tuple[int, int], g: float = float('inf'),
     
     Returns:
         Dictionary containing node information
+    Examples:
+    >>> node = create_node((0, 0), g=5, h=3, parent=None)
+    >>> node['position']
+    (0, 0)
+    >>> node['g']
+    5
+    >>> node['h']
+    3
+    >>> node['f']
+    8
+    >>> node['parent'] is None
+    True
     """
     return {
         'position': position,
@@ -33,7 +42,7 @@ def create_node(position: tuple[int, int], g: float = float('inf'),
     }
 
 @jit(nopython=True)
-def neighbor_nodes(point, rows, cols) -> list:
+def neighbor_nodes(point: tuple, rows: int, cols: int) -> list:
     """Finds neighbor points.
     Args: 
         point (tuple): Current position (x, y).
@@ -41,6 +50,10 @@ def neighbor_nodes(point, rows, cols) -> list:
         cols (int): an amount of rows in matrix.
     Returns:
         list: list of neighbour points.
+    >>> neighbor_nodes((1, 1), 3, 3)
+    [(2, 1), (0, 1), (1, 2), (1, 0)]
+    >>> neighbor_nodes((0, 0), 3, 3)
+    [(1, 0), (0, 1)]
     """
     totresult = []
     result = [(point[0] + 1, point[1]), (point[0] - 1, point[1]),
@@ -51,18 +64,25 @@ def neighbor_nodes(point, rows, cols) -> list:
     return totresult 
 
 @jit(nopython=True)
-def h_x(curr_point, goal):
+def h_x(curr_point: tuple, goal: tuple):
     """Calculates the heuristic (h(x)) from the current point to the goal
     Args:
         curr_point (tuple): Current position (x, y).
         goal (tuple): Goal position (x, y).
 
     Returns:
-        int: The Manhattan distance between the current point and the goal."""
+        int: The Manhattan distance between the current point and the goal.
+    >>> h_x((0, 0), (2, 2))
+    4
+    >>> h_x((1, 1), (1, 1))
+    0
+    >>> h_x((5, 5), (2, 3))
+    5
+    """
     return abs(curr_point[0] - goal[0]) + abs(curr_point[1] - goal[1])
 
 @jit(nopython=True)
-def g_x(curr_height, start_height, step=1):
+def g_x(curr_height: int, start_height: int, step=1):
     """
     Finds heuristic cost of current point from start.
     Args:
@@ -72,11 +92,17 @@ def g_x(curr_height, start_height, step=1):
 
     Returns:
         int: The hueristic cost of current point.
+    >>> g_x(10, 5)
+    5.0990195135927845
+    >>> g_x(7, 7)
+    1.0
+    >>> g_x(15, 5)
+    10.04987562112089
     """
     distance = curr_height - start_height
     return (step ** 2 + distance ** 2) ** 0.5
 
-def astar_search(matr, start, goal):
+def astar_search(matr: list[list], start: tuple, goal: tuple):
     """
     Implements the A* pathfinding algorithm to find the shortest path 
     in a grid from start to goal.
@@ -85,7 +111,20 @@ def astar_search(matr, start, goal):
         start tuple(int): start position (x, y).
         goal: tuple(int): goal position (x, y).
     Returns:
-        list[tuple[int]]: the shortest path form start to goal.
+        list[tuple[int]]: the shortest path form start to goal or None.
+    >>> matr = np.array([
+    ...     [1, 1, 1, 1],
+    ...     [1, 1000, 1000, 1],
+    ...     [1, 1, 1, 1],
+    ...     [1, 1, 1, 1],
+    ... ])
+    >>> start = (0, 0)
+    >>> goal = (3, 3)
+    >>> path = astar_search(matr, start, goal)
+    >>> path[0] == start
+    True
+    >>> path[-1] == goal
+    True
     """
     rows, cols = matr.shape
     closed_set = set()
@@ -123,7 +162,7 @@ def astar_search(matr, start, goal):
     return None
 
 @jit(nopython=True)
-def generate_matrix(rows, cols):
+def generate_matrix(rows: int, cols: int):
     """Generates matrix of random numbers with specific size.
     Args:
         rows (int): an amount of rows in matrix.
@@ -131,6 +170,11 @@ def generate_matrix(rows, cols):
     Returns:
         list[int]: a matrix which is consisted of random numbers, which represent
         the height of a point.
+    >>> matrix = generate_matrix(2, 2)
+    >>> matrix.shape
+    (2, 2)
+    >>> (matrix >= 1).all() and (matrix <= 10000).all()
+    np.True_
     """
     return np.random.randint(1, 10001, size=(rows, cols))
 
@@ -138,15 +182,16 @@ def main():
     parser = argparse.ArgumentParser(description="A* Pathfinding Algorithm")
     parser.add_argument("--rows", type=int, default=10000, help="Number of rows in the matrix")
     parser.add_argument("--cols", type=int, default=10000, help="Number of columns in the matrix")
+    parser.add_argument("--start", type=lambda s: tuple(map(int, s.split(','))),
+    default=(random.randint(0, 10000), random.randint(0, 10000)), help="Coordinates of start point")
+    parser.add_argument("--goal", type=lambda s: tuple(map(int, s.split(','))),
+    default=(random.randint(0, 10000), random.randint(0, 10000)), help="Coordinates of goal point")
 
     args = parser.parse_args()
-
     rows, cols = args.rows, args.cols
+    start, goal = args.start, args.goal
 
     matrix = generate_matrix(rows, cols)
-
-    start = (random.randint(0, rows - 1), random.randint(0, cols - 1))
-    goal = (random.randint(0, rows - 1), random.randint(0, cols - 1))
 
     print("Start:", start)
     print("Goal:", goal)
@@ -163,3 +208,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+if __name__ == '__main__':
+    import doctest
+    print(doctest.testmod())
